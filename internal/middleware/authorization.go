@@ -2,41 +2,46 @@ package middleware
 
 import (
 	"errors"
-"net/http"
+	"fmt"
+	"net/http"
 
-"github.com/brunocostaprado/goapi/api"
-"github.com/brunocostaprado/goapi/internal/tools"
+	"github.com/brunocostaprado/goapi/api"
+	"github.com/brunocostaprado/goapi/internal/tools"
 
-log "github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
+var UnAuthorizedError = errors.New(fmt.Sprintf("Invalid username or token."))
 
-var UnAuthorizedError=errors.New("Invalid username or taken.")
+func Authorization(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-func Authorization(next http.Handler) http.Handler{
+		var username string = r.URL.Query().Get("username")
+		var token = r.Header.Get("Authorization")
+		var err error
 
-	return http.HandlerFunc(func(w http.ResponseWriter,r *http.Request) {
-		var username string= r.URL.Query().Get("username")
-var token=r.Header.Get("Authorization")
-var err=error
-		if username=="" || token==""{
-			log.Error(UnAuthorizedError)
-			api.RequestErrorHandler(w,UnAuthorizedError)
-			return  
+		if username == "" {
+			api.RequestErrorHandler(w, UnAuthorizedError)
+			return
 		}
+
 		var database *tools.DatabaseInterface
-		database,err=tools.NewDatabase()
-		if err!=nil{
+		database, err = tools.NewDatabase()
+		if err != nil {
 			api.InternalErrorHandler(w)
 			return
 		}
-		var loginDetails *tools.loginDetails
-		loginDetails=(*&database).GetUserLoginDetails(username)
-		if(loginDetails==nil||(token !=(*loginDetails).AuthToken)){
+
+		var loginDetails *tools.LoginDetails
+		loginDetails = (*database).GetUserLoginDetails(username)
+
+		if loginDetails == nil || (token != (*loginDetails).AuthToken) {
 			log.Error(UnAuthorizedError)
-			api.RequestErrorHandler(w,UnAuthorizedError)
-			return 
+			api.RequestErrorHandler(w, UnAuthorizedError)
+			return
 		}
-		next.ServeHTTP(w,r)
+
+		next.ServeHTTP(w, r)
+
 	})
 }
